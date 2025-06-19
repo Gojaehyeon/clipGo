@@ -44,7 +44,11 @@ struct ClipboardHistoryPopover: View {
                         ScrollView {
                             VStack(spacing: 0) {
                                 ForEach(Array(filteredHistory.enumerated()), id: \ .offset) { (index, item) in
-                                    HStack(alignment: .center, spacing: 8) {
+                                    FocusableRow(
+                                        index: index,
+                                        selectedIndex: $selectedIndex,
+                                        onSelect: { onSelect(item) }
+                                    ) {
                                         Button(action: { onSelect(item) }) {
                                             switch item.type {
                                             case .text(let string):
@@ -54,7 +58,7 @@ struct ClipboardHistoryPopover: View {
                                                     .truncationMode(.tail)
                                                     .font(.system(size: 12))
                                                     .padding(.vertical, 4)
-                                                    .padding(.horizontal, 4)
+                                                    .padding(.leading, 12)
                                                     .frame(maxWidth: 180, alignment: .leading)
                                                     .fixedSize(horizontal: false, vertical: true)
                                             case .image(let image):
@@ -65,54 +69,28 @@ struct ClipboardHistoryPopover: View {
                                                         .frame(width: 30, height: 30)
                                                         .cornerRadius(4)
                                                         .padding(.vertical, 4)
-                                                        .padding(.horizontal, 4)
+                                                        .padding(.leading, 12)
                                                 } else {
                                                     Text(isKorean ? "[이미지]" : "[Image]")
                                                         .font(.system(size: 12))
                                                         .padding(.vertical, 4)
-                                                        .padding(.horizontal, 4)
+                                                        .padding(.leading, 12)
                                                 }
                                             }
                                         }
                                         .buttonStyle(PlainButtonStyle())
-                                        .onTapGesture {
-                                            onSelect(item)
-                                        }
-                                        .onHover { hovering in
-                                            if hovering {
-                                                selectedIndex = index
-                                            }
-                                        }
                                         Spacer(minLength: 0)
-                                        // 숫자 인덱스 (1~9만)
                                         if index < 9 {
                                             Text("\(index+1)")
-                                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                                .font(.system(size: 12, weight: .regular, design: .monospaced))
                                                 .foregroundColor(.secondary)
                                                 .frame(width: 18, alignment: .trailing)
+                                                .padding(.trailing, 12)
                                         } else {
                                             Spacer().frame(width: 18)
                                         }
-                                        // 삭제 버튼 (오른쪽)
-                                        /*
-                                        Button(action: {
-                                            if let idx = clipboardManager.history.firstIndex(of: item) {
-                                                clipboardManager.history.remove(at: idx)
-                                            }
-                                        }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundColor(.secondary)
-                                                .imageScale(.medium)
-                                                .padding(.trailing, 4)
-                                                .help(isKorean ? "삭제" : "Delete")
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        */
                                     }
                                     .id(index)
-                                    .background(selectedIndex == index ? Color.accentColor.opacity(0.18) : Color.clear)
-                                    .cornerRadius(6)
-                                    .padding(.horizontal, 8)
                                     Divider()
                                 }
                             }
@@ -145,7 +123,6 @@ struct ClipboardHistoryPopover: View {
         .background(.ultraThinMaterial)
         .cornerRadius(25)
         .frame(width: 320)
-        .padding(8)
         .onAppear {
             // 창이 열릴 때 첫 번째 아이템에 선택
             if !filteredHistory.isEmpty {
@@ -198,4 +175,33 @@ struct ClipboardHistoryPopover: View {
             }
         }
     }
-} 
+}
+
+struct FocusableRow<Content: View>: View {
+    let index: Int
+    @Binding var selectedIndex: Int?
+    let onSelect: () -> Void
+    @ViewBuilder let content: () -> Content
+    @State private var isHovering = false
+    var body: some View {
+        ZStack {
+            if isHovering || selectedIndex == index {
+                Color.accentColor.opacity(isHovering ? 0.12 : 0.18)
+                    .cornerRadius(6)
+            }
+            HStack(spacing: 8) {
+                content()
+                    .padding(.horizontal, 12)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering { selectedIndex = index }
+        }
+        .onTapGesture { onSelect() }
+    }
+}
