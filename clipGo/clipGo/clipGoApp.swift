@@ -27,6 +27,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
     var statusItem: NSStatusItem?
 
+    var isKorean: Bool {
+        Locale.current.language.languageCode?.identifier == "ko"
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("[AppDelegate] Application did finish launching")
         // 메뉴바 아이콘 및 메뉴 생성
@@ -43,7 +47,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func buildMenu() -> NSMenu {
         let menu = NSMenu()
         let history = clipboardManager.history
-        let isKorean = Locale.current.languageCode == "ko"
         if history.isEmpty {
             let emptyItem = NSMenuItem(title: isKorean ? "클립보드 기록 없음" : "No clipboard history", action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false

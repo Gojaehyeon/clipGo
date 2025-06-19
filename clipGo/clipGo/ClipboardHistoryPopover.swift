@@ -6,7 +6,9 @@ struct ClipboardHistoryPopover: View {
     @State private var selectedTab: Tab = .all
     
     enum Tab { case all, favorite }
-    var isKorean: Bool { Locale.current.languageCode == "ko" }
+    var isKorean: Bool {
+        Locale.current.language.languageCode?.identifier == "ko"
+    }
     
     var filteredHistory: [ClipboardItem] {
         switch selectedTab {

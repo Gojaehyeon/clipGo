@@ -2,7 +2,9 @@ import Cocoa
 import HotKey
 
 class HotKeyPopoverViewController: NSViewController {
-    private let isKorean = Locale.current.languageCode == "ko"
+    private var isKorean: Bool {
+        Locale.current.language.languageCode?.identifier == "ko"
+    }
     private let currentHotKeyLabel = NSTextField(labelWithString: "")
     private let changeButton = NSButton(title: "", target: nil, action: nil)
     private let saveButton = NSButton(title: "", target: nil, action: nil)
