@@ -32,7 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 메뉴바 아이콘 및 메뉴 생성
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipGo")
+            button.image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: "ClipGo")
             button.action = #selector(statusItemClicked(_:))
             button.target = self
         }
@@ -71,9 +71,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(NSMenuItem.separator())
-        let settingsItem = NSMenuItem(title: "설정", action: #selector(showSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
+        let hotkeyTitle = "단축키 변경 (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
+        let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "h")
+        hotkeyItem.target = self
+        menu.addItem(hotkeyItem)
+        menu.addItem(NSMenuItem.separator())
+        let aboutItem = NSMenuItem(title: "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
         let quitItem = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -97,17 +102,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardManager.copyToPasteboard(item, paste: true)
     }
 
-    @objc func showSettings() {
-        print("[AppDelegate] showSettings called")
-        if settingsWindow == nil {
-            let hosting = NSHostingController(rootView: SettingsView())
-            settingsWindow = NSWindow(contentViewController: hosting)
-            settingsWindow?.title = "설정"
-            settingsWindow?.setContentSize(NSSize(width: 340, height: 120))
-            settingsWindow?.styleMask = [.titled, .closable, .miniaturizable]
+    @objc func showHotKeyPopoverMenu() {
+        let popover = NSPopover()
+        popover.contentSize = NSSize(width: 260, height: 140)
+        popover.behavior = .transient
+        popover.contentViewController = HotKeyPopoverViewController()
+        if let button = statusItem?.button {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+        } else if let keyWindow = NSApp.keyWindow, let contentView = keyWindow.contentView {
+            popover.show(relativeTo: contentView.bounds, of: contentView, preferredEdge: .maxY)
+        } else if let mainWindow = NSApp.mainWindow, let contentView = mainWindow.contentView {
+            popover.show(relativeTo: contentView.bounds, of: contentView, preferredEdge: .maxY)
+        } else if let window = NSApp.windows.first, let contentView = window.contentView {
+            popover.show(relativeTo: contentView.bounds, of: contentView, preferredEdge: .maxY)
         }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func showAboutClipGo() {
+        let alert = NSAlert()
+        alert.messageText = "ClipGo"
+        alert.informativeText = "Version 1.0\nAll rights reserved, 2025 gojaehyun\nMade by Gojaehyun, who loves Jesus"
+        if let icon = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil) {
+            alert.icon = icon
+        }
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc func quitApp() {
