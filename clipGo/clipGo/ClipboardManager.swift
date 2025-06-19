@@ -40,6 +40,7 @@ class ClipboardManager: ObservableObject {
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
     private let maxHistory = 20
+    var movePastedToTop: Bool = false
 
     init() {
         lastChangeCount = pasteboard.changeCount
@@ -48,7 +49,8 @@ class ClipboardManager: ObservableObject {
 
     private func startMonitoring() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkPasteboard()
+            guard let self = self else { return }
+            self.checkPasteboard()
         }
     }
 
@@ -61,9 +63,18 @@ class ClipboardManager: ObservableObject {
             } else if let imageData = pasteboard.data(forType: .tiff), let image = NSImage(data: imageData) {
                 newItem = ClipboardItem(type: .image(image))
             }
-            if let item = newItem, history.first?.type != item.type {
-                history.insert(item, at: 0)
-                history = Array(history.prefix(maxHistory))
+            if let item = newItem {
+                if let existIdx = history.firstIndex(where: { $0.type == item.type }) {
+                    if movePastedToTop {
+                        let exist = history.remove(at: existIdx)
+                        history.insert(exist, at: 0)
+                    } else {
+                        // 기존 항목이면 순서 유지(아무것도 안함)
+                    }
+                } else {
+                    history.insert(item, at: 0)
+                    history = Array(history.prefix(maxHistory))
+                }
             }
         }
     }

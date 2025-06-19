@@ -31,6 +31,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Locale.current.language.languageCode?.identifier == "ko"
     }
 
+    // 최근 붙여넣은 항목 상단 이동 여부 저장용
+    var movePastedToTop: Bool {
+        get { UserDefaults.standard.bool(forKey: "movePastedToTop") }
+        set { UserDefaults.standard.set(newValue, forKey: "movePastedToTop") }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("[AppDelegate] Application did finish launching")
         // 메뉴바 아이콘 및 메뉴 생성
@@ -42,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem?.menu = buildMenu()
         HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showMenuBarMenu))
+        clipboardManager.movePastedToTop = movePastedToTop
     }
 
     func buildMenu() -> NSMenu {
@@ -96,10 +103,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(NSMenuItem.separator())
+        let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear All", action: #selector(clearAllHistory), keyEquivalent: "")
+        clearAllItem.target = self
+        menu.addItem(clearAllItem)
         let hotkeyTitle = (isKorean ? "단축키 변경" : "Change Hotkey") + " (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
         let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "")
         hotkeyItem.target = self
         menu.addItem(hotkeyItem)
+        // 최근 붙여넣은 항목 상단 이동 체크박스
+        let moveToTopTitle = isKorean ? "최근 붙여넣은 항목 상단으로 보내기" : "Move pasted item to top"
+        let moveToTopItem = NSMenuItem(title: moveToTopTitle, action: #selector(toggleMovePastedToTop), keyEquivalent: "")
+        moveToTopItem.target = self
+        moveToTopItem.state = movePastedToTop ? .on : .off
+        moveToTopItem.setAccessibilityRole(.checkBox)
+        menu.addItem(moveToTopItem)
         menu.addItem(NSMenuItem.separator())
         let aboutItem = NSMenuItem(title: isKorean ? "ClipGo 정보" : "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
         aboutItem.target = self
@@ -124,6 +141,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func selectClipboardItem(_ sender: NSMenuItem) {
         let item = clipboardManager.history[sender.tag]
         print("[AppDelegate] Clipboard item selected: \(item)")
+        if movePastedToTop {
+            // 붙여넣은 항목을 상단으로 이동
+            clipboardManager.history.remove(at: sender.tag)
+            clipboardManager.history.insert(item, at: 0)
+        }
         clipboardManager.copyToPasteboard(item, paste: true)
     }
 
@@ -156,6 +178,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    @objc func clearAllHistory() {
+        clipboardManager.history.removeAll()
+        statusItem?.menu = buildMenu() // 메뉴 갱신
+    }
+
+    @objc func toggleMovePastedToTop() {
+        movePastedToTop.toggle()
+        clipboardManager.movePastedToTop = movePastedToTop
+        statusItem?.menu = buildMenu() // 메뉴 갱신
     }
 }
 

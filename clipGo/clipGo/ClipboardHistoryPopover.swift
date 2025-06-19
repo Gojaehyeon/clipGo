@@ -3,6 +3,7 @@ import SwiftUI
 struct ClipboardHistoryPopover: View {
     @ObservedObject var clipboardManager: ClipboardManager
     var onSelect: (ClipboardItem) -> Void
+    var onChangeHotkey: (() -> Void)? = nil
     @State private var selectedTab: Tab = .all
     @State private var keyMonitor: Any? = nil
     
@@ -30,6 +31,36 @@ struct ClipboardHistoryPopover: View {
                 Text(isKorean ? "클립보드 기록 없음" : "No clipboard history")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
+            }
+            // Change Hotkey 버튼 위에 전체 삭제 버튼 추가
+            Button(action: {
+                clipboardManager.history.removeAll()
+            }) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "trash")
+                    Text(isKorean ? "전체 삭제" : "Clear All")
+                    Spacer()
+                }
+            }
+            .buttonStyle(.bordered)
+            .font(.system(size: 13, weight: .regular))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+            // Change Hotkey 버튼
+            if let onChangeHotkey = onChangeHotkey {
+                Button(action: { onChangeHotkey() }) {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "keyboard")
+                        Text(isKorean ? "단축키 변경" : "Change Hotkey")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .font(.system(size: 13, weight: .regular))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
             }
             ForEach(Array(filteredHistory.enumerated()), id: \ .element.id) { (index, item) in
                 HStack(alignment: .center, spacing: 8) {
