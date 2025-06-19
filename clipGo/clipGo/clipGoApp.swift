@@ -57,7 +57,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             for (index, item) in history.enumerated() {
                 switch item.type {
                 case .text(let string):
-                    let menuItem = NSMenuItem(title: string, action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
+                    let displayTitle = string.count > 50 ? String(string.prefix(50)) + "..." : string
+                    let menuItem = NSMenuItem(title: displayTitle, action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
                     menuItem.target = self
                     menuItem.tag = index
                     menu.addItem(menuItem)

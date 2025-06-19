@@ -11,11 +11,13 @@ struct ClipboardHistoryPopover: View {
                     HStack(alignment: .center, spacing: 8) {
                         switch item.type {
                         case .text(let string):
-                            Text(string)
+                            let displayText = string.count > 50 ? String(string.prefix(50)) + "..." : string
+                            Text(displayText)
                                 .lineLimit(2)
                                 .truncationMode(.tail)
                                 .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(maxWidth: 220, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         case .image(let image):
                             if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                                 Image(decorative: cgImage, scale: 1.0)
