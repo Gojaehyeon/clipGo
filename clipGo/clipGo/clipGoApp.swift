@@ -73,7 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.addItem(NSMenuItem.separator())
         let hotkeyTitle = (isKorean ? "단축키 변경" : "Change Hotkey") + " (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
-        let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "h")
+        let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "")
         hotkeyItem.target = self
         menu.addItem(hotkeyItem)
         menu.addItem(NSMenuItem.separator())
