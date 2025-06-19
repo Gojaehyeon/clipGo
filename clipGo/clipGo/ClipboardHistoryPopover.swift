@@ -4,6 +4,7 @@ struct ClipboardHistoryPopover: View {
     @ObservedObject var clipboardManager: ClipboardManager
     var onSelect: (ClipboardItem) -> Void
     @State private var selectedTab: Tab = .all
+    @State private var keyMonitor: Any? = nil
     
     enum Tab { case all, favorite }
     var isKorean: Bool {
@@ -30,8 +31,22 @@ struct ClipboardHistoryPopover: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
             }
-            ForEach(filteredHistory) { item in
+            ForEach(Array(filteredHistory.enumerated()), id: \ .element.id) { (index, item) in
                 HStack(alignment: .center, spacing: 8) {
+                    // 단축키 안내
+                    if index == 0 {
+                        Text("⏎")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.accentColor)
+                            .frame(width: 22)
+                    } else if index <= 9 {
+                        Text("\(index)")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.accentColor)
+                            .frame(width: 22)
+                    } else {
+                        Spacer().frame(width: 22)
+                    }
                     // 즐겨찾기 버튼 (왼쪽)
                     Button(action: {
                         if let idx = clipboardManager.history.firstIndex(of: item) {
@@ -92,5 +107,28 @@ struct ClipboardHistoryPopover: View {
         .cornerRadius(10)
         .frame(width: 320)
         .padding(8)
+        .onAppear {
+            // 키보드 단축키 모니터 등록
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let key = event.charactersIgnoringModifiers ?? ""
+                if key == "\r" || key == "\n" { // Return/Enter
+                    if let first = filteredHistory.first {
+                        onSelect(first)
+                        return nil
+                    }
+                } else if let num = Int(key), num > 0, num <= 9, filteredHistory.count > num {
+                    onSelect(filteredHistory[num])
+                    return nil
+                }
+                return event
+            }
+        }
+        .onDisappear {
+            // 키보드 모니터 해제
+            if let monitor = keyMonitor {
+                NSEvent.removeMonitor(monitor)
+                keyMonitor = nil
+            }
+        }
     }
 } 

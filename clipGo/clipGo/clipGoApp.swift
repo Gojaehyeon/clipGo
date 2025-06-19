@@ -53,25 +53,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(emptyItem)
         } else {
             for (index, item) in history.enumerated() {
+                var keyEquivalent = ""
+                var suffix = ""
+                if index < 9 {
+                    keyEquivalent = "\(index+1)"
+                    suffix = " \(index+1)"
+                }
+                let mainText: String
                 switch item.type {
                 case .text(let string):
-                    let displayTitle = string.count > 50 ? String(string.prefix(50)) + "..." : string
-                    let menuItem = NSMenuItem(title: displayTitle, action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
-                    menuItem.target = self
-                    menuItem.tag = index
-                    menu.addItem(menuItem)
-                case .image(let image):
-                    let menuItem = NSMenuItem(title: "[이미지]", action: #selector(selectClipboardItem(_:)), keyEquivalent: "")
-                    menuItem.target = self
-                    menuItem.tag = index
+                    mainText = string.count > 50 ? String(string.prefix(50)) + "..." : string
+                case .image(_):
+                    mainText = "[이미지]"
+                }
+                // NSAttributedString: 본문 + 흐릿한 숫자(suffix)
+                let attrTitle = NSMutableAttributedString(string: mainText, attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: NSFont.systemFont(ofSize: 13)
+                ])
+                if !suffix.isEmpty {
+                    attrTitle.append(NSAttributedString(string: suffix, attributes: [
+                        .foregroundColor: NSColor.secondaryLabelColor,
+                        .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+                    ]))
+                }
+                let menuItem = NSMenuItem(title: "", action: #selector(selectClipboardItem(_:)), keyEquivalent: keyEquivalent)
+                menuItem.attributedTitle = attrTitle
+                menuItem.target = self
+                menuItem.tag = index
+                if !keyEquivalent.isEmpty {
+                    menuItem.keyEquivalentModifierMask = []
+                }
+                if case .image(let image) = item.type {
                     let imageSize = NSSize(width: 24, height: 24)
                     let thumbnail = NSImage(size: imageSize)
                     thumbnail.lockFocus()
                     image.draw(in: NSRect(origin: .zero, size: imageSize), from: .zero, operation: .copy, fraction: 1.0)
                     thumbnail.unlockFocus()
                     menuItem.image = thumbnail
-                    menu.addItem(menuItem)
                 }
+                menu.addItem(menuItem)
             }
         }
         menu.addItem(NSMenuItem.separator())
