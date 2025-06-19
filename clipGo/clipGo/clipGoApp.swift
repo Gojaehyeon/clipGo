@@ -8,11 +8,6 @@
 import SwiftUI
 import HotKey
 
-class ContextMenuPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
-}
-
 @main
 struct ClipGoApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -31,7 +26,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let clipboardManager = ClipboardManager()
     var settingsWindow: NSWindow?
     var statusItem: NSStatusItem?
-    var clipboardPanel: ContextMenuPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("[AppDelegate] Application did finish launching")

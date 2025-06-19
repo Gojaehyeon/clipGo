@@ -19,8 +19,19 @@ enum ClipboardItemType: Equatable {
 }
 
 struct ClipboardItem: Identifiable, Equatable {
-    let id = UUID()
+    let id: UUID
     let type: ClipboardItemType
+    var isFavorite: Bool
+    
+    init(type: ClipboardItemType, isFavorite: Bool = false) {
+        self.id = UUID()
+        self.type = type
+        self.isFavorite = isFavorite
+    }
+    
+    static func == (lhs: ClipboardItem, rhs: ClipboardItem) -> Bool {
+        lhs.id == rhs.id && lhs.type == rhs.type && lhs.isFavorite == rhs.isFavorite
+    }
 }
 
 class ClipboardManager: ObservableObject {

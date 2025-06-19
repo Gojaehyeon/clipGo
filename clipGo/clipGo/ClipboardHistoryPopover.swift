@@ -3,12 +3,40 @@ import SwiftUI
 struct ClipboardHistoryPopover: View {
     @ObservedObject var clipboardManager: ClipboardManager
     var onSelect: (ClipboardItem) -> Void
+    @State private var selectedTab: Tab = .all
+    
+    enum Tab { case all, favorite }
+    
+    var filteredHistory: [ClipboardItem] {
+        switch selectedTab {
+        case .all: return clipboardManager.history
+        case .favorite: return clipboardManager.history.filter { $0.isFavorite }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(clipboardManager.history) { item in
-                Button(action: { onSelect(item) }) {
-                    HStack(alignment: .center, spacing: 8) {
+            Picker("", selection: $selectedTab) {
+                Text("All").tag(Tab.all)
+                Text("Bookmark").tag(Tab.favorite)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.horizontal, 8)
+            ForEach(filteredHistory) { item in
+                HStack(alignment: .center, spacing: 8) {
+                    // 즐겨찾기 버튼 (왼쪽)
+                    Button(action: {
+                        if let idx = clipboardManager.history.firstIndex(of: item) {
+                            clipboardManager.history[idx].isFavorite.toggle()
+                        }
+                    }) {
+                        Image(systemName: item.isFavorite ? "star.fill" : "star")
+                            .foregroundColor(item.isFavorite ? .yellow : .secondary)
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    // 본문(텍스트/이미지)
+                    Button(action: { onSelect(item) }) {
                         switch item.type {
                         case .text(let string):
                             let displayText = string.count > 50 ? String(string.prefix(50)) + "..." : string
@@ -32,8 +60,21 @@ struct ClipboardHistoryPopover: View {
                             }
                         }
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    Spacer(minLength: 0)
+                    // 삭제 버튼 (오른쪽)
+                    Button(action: {
+                        if let idx = clipboardManager.history.firstIndex(of: item) {
+                            clipboardManager.history.remove(at: idx)
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .imageScale(.medium)
+                            .padding(.trailing, 4)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
                 Divider()
             }
         }
