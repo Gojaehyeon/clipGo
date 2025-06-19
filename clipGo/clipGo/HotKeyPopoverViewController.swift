@@ -92,7 +92,7 @@ class HotKeyPopoverViewController: NSViewController {
 
     @objc private func saveHotKey() {
         guard let key = capturedKey, let modifiers = capturedModifiers else { return }
-        HotKeyManager.shared.updateHotKey(key: key, modifiers: modifiers, target: NSApp.delegate as AnyObject, action: #selector(AppDelegate.showMenuBarMenu))
+        HotKeyManager.shared.updateHotKey(key: key, modifiers: modifiers, target: NSApp.delegate as AnyObject, action: #selector(AppDelegate.showCustomPopover))
         print("💾 Hotkey saved")
         self.view.window?.close()
     }

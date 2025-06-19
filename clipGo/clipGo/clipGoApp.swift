@@ -26,6 +26,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let clipboardManager = ClipboardManager()
     var settingsWindow: NSWindow?
     var statusItem: NSStatusItem?
+    var popoverPanel: NSPanel?
+    var escKeyMonitor: Any?
+    var prevApp: NSRunningApplication? = nil
 
     var isKorean: Bool {
         Locale.current.language.languageCode?.identifier == "ko"
@@ -47,61 +50,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
         }
         statusItem?.menu = buildMenu()
-        HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showMenuBarMenu))
+        HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showCustomPopover))
         clipboardManager.movePastedToTop = movePastedToTop
     }
 
     func buildMenu() -> NSMenu {
         let menu = NSMenu()
-        let history = clipboardManager.history
-        if history.isEmpty {
-            let emptyItem = NSMenuItem(title: isKorean ? "클립보드 기록 없음" : "No clipboard history", action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            menu.addItem(emptyItem)
-        } else {
-            for (index, item) in history.enumerated() {
-                var keyEquivalent = ""
-                var suffix = ""
-                if index < 9 {
-                    keyEquivalent = "\(index+1)"
-                    suffix = " \(index+1)"
-                }
-                let mainText: String
-                switch item.type {
-                case .text(let string):
-                    mainText = string.count > 50 ? String(string.prefix(50)) + "..." : string
-                case .image(_):
-                    mainText = "[이미지]"
-                }
-                // NSAttributedString: 본문 + 흐릿한 숫자(suffix)
-                let attrTitle = NSMutableAttributedString(string: mainText, attributes: [
-                    .foregroundColor: NSColor.labelColor,
-                    .font: NSFont.systemFont(ofSize: 13)
-                ])
-                if !suffix.isEmpty {
-                    attrTitle.append(NSAttributedString(string: suffix, attributes: [
-                        .foregroundColor: NSColor.secondaryLabelColor,
-                        .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-                    ]))
-                }
-                let menuItem = NSMenuItem(title: "", action: #selector(selectClipboardItem(_:)), keyEquivalent: keyEquivalent)
-                menuItem.attributedTitle = attrTitle
-                menuItem.target = self
-                menuItem.tag = index
-                if !keyEquivalent.isEmpty {
-                    menuItem.keyEquivalentModifierMask = []
-                }
-                if case .image(let image) = item.type {
-                    let imageSize = NSSize(width: 24, height: 24)
-                    let thumbnail = NSImage(size: imageSize)
-                    thumbnail.lockFocus()
-                    image.draw(in: NSRect(origin: .zero, size: imageSize), from: .zero, operation: .copy, fraction: 1.0)
-                    thumbnail.unlockFocus()
-                    menuItem.image = thumbnail
-                }
-                menu.addItem(menuItem)
-            }
-        }
+        // About ClipGo 메뉴만 상단에 추가
+        let aboutItem = NSMenuItem(title: isKorean ? "ClipGo 정보" : "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
         menu.addItem(NSMenuItem.separator())
         let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear All", action: #selector(clearAllHistory), keyEquivalent: "")
         clearAllItem.target = self
@@ -118,9 +76,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         moveToTopItem.setAccessibilityRole(.checkBox)
         menu.addItem(moveToTopItem)
         menu.addItem(NSMenuItem.separator())
-        let aboutItem = NSMenuItem(title: isKorean ? "ClipGo 정보" : "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
         let quitItem = NSMenuItem(title: isKorean ? "종료" : "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -132,10 +87,96 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.performClick(nil)
     }
 
-    @objc func showMenuBarMenu() {
-        print("[AppDelegate] showMenuBarMenu called")
-        statusItem?.menu = buildMenu()
-        statusItem?.button?.performClick(nil)
+    @objc func showCustomPopover() {
+        // 창 띄우기 직전, 현재 포커스 앱 저장
+        prevApp = NSWorkspace.shared.frontmostApplication
+        if let panel = popoverPanel, panel.isVisible {
+            panel.close()
+            popoverPanel = nil
+            if let monitor = escKeyMonitor {
+                NSEvent.removeMonitor(monitor)
+                escKeyMonitor = nil
+            }
+            return
+        }
+        let contentView = ClipboardHistoryPopover(
+            clipboardManager: clipboardManager,
+            onSelect: { [weak self] item in
+                guard let self = self else { return }
+                if self.movePastedToTop {
+                    if let idx = self.clipboardManager.history.firstIndex(of: item) {
+                        self.clipboardManager.history.remove(at: idx)
+                        self.clipboardManager.history.insert(item, at: 0)
+                    }
+                }
+                self.popoverPanel?.close()
+                self.popoverPanel = nil
+                if let monitor = self.escKeyMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    self.escKeyMonitor = nil
+                }
+                // 이전 앱으로 포커스 복원
+                if let prevApp = self.prevApp {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                        prevApp.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+                        // 약간의 딜레이 후 붙여넣기
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                            self.clipboardManager.copyToPasteboard(item, paste: true)
+                        }
+                    }
+                    self.prevApp = nil
+                } else {
+                    self.clipboardManager.copyToPasteboard(item, paste: true)
+                }
+            },
+            onChangeHotkey: { [weak self] in self?.showHotKeyPopoverMenu() }
+        )
+        let hosting = NSHostingController(rootView: contentView)
+        let panel = NSPanel(contentViewController: hosting)
+        panel.styleMask = [.titled, .nonactivatingPanel, .fullSizeContentView]
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.hasShadow = true
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        // ESC, 바깥 클릭 시 닫힘
+        NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
+            self?.popoverPanel?.close()
+            self?.popoverPanel = nil
+            if let monitor = self?.escKeyMonitor {
+                NSEvent.removeMonitor(monitor)
+                self?.escKeyMonitor = nil
+            }
+        }
+        // 화면 중앙에 위치 (마우스 커서 기준)
+        let mouseLocation = NSEvent.mouseLocation
+        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) {
+            let size = NSSize(width: 340, height: 420)
+            let origin = NSPoint(x: screen.frame.midX - size.width/2, y: screen.frame.midY - size.height/2)
+            panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        popoverPanel = panel
+        // ESC 키로 닫기
+        escKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { // ESC
+                self?.popoverPanel?.close()
+                self?.popoverPanel = nil
+                if let monitor = self?.escKeyMonitor {
+                    NSEvent.removeMonitor(monitor)
+                    self?.escKeyMonitor = nil
+                }
+                return nil
+            }
+            return event
+        }
     }
 
     @objc func selectClipboardItem(_ sender: NSMenuItem) {
