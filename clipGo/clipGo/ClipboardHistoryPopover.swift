@@ -6,6 +6,7 @@ struct ClipboardHistoryPopover: View {
     @State private var selectedTab: Tab = .all
     
     enum Tab { case all, favorite }
+    var isKorean: Bool { Locale.current.languageCode == "ko" }
     
     var filteredHistory: [ClipboardItem] {
         switch selectedTab {
@@ -17,11 +18,16 @@ struct ClipboardHistoryPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Picker("", selection: $selectedTab) {
-                Text("All").tag(Tab.all)
-                Text("Bookmark").tag(Tab.favorite)
+                Text(isKorean ? "전체" : "All").tag(Tab.all)
+                Text(isKorean ? "즐겨찾기" : "Bookmark").tag(Tab.favorite)
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding(.horizontal, 8)
+            if filteredHistory.isEmpty {
+                Text(isKorean ? "클립보드 기록 없음" : "No clipboard history")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            }
             ForEach(filteredHistory) { item in
                 HStack(alignment: .center, spacing: 8) {
                     // 즐겨찾기 버튼 (왼쪽)
@@ -33,6 +39,7 @@ struct ClipboardHistoryPopover: View {
                         Image(systemName: item.isFavorite ? "star.fill" : "star")
                             .foregroundColor(item.isFavorite ? .yellow : .secondary)
                             .imageScale(.medium)
+                            .help(isKorean ? "즐겨찾기" : "Bookmark")
                     }
                     .buttonStyle(PlainButtonStyle())
                     // 본문(텍스트/이미지)
@@ -55,7 +62,7 @@ struct ClipboardHistoryPopover: View {
                                     .cornerRadius(6)
                                     .padding(8)
                             } else {
-                                Text("[이미지]")
+                                Text(isKorean ? "[이미지]" : "[Image]")
                                     .padding(8)
                             }
                         }
@@ -72,6 +79,7 @@ struct ClipboardHistoryPopover: View {
                             .foregroundColor(.secondary)
                             .imageScale(.medium)
                             .padding(.trailing, 4)
+                            .help(isKorean ? "삭제" : "Delete")
                     }
                     .buttonStyle(PlainButtonStyle())
                 }

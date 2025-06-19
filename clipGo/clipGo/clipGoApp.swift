@@ -43,8 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func buildMenu() -> NSMenu {
         let menu = NSMenu()
         let history = clipboardManager.history
+        let isKorean = Locale.current.languageCode == "ko"
         if history.isEmpty {
-            let emptyItem = NSMenuItem(title: "클립보드 기록 없음", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: isKorean ? "클립보드 기록 없음" : "No clipboard history", action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         } else {
@@ -71,15 +72,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(NSMenuItem.separator())
-        let hotkeyTitle = "단축키 변경 (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
+        let hotkeyTitle = (isKorean ? "단축키 변경" : "Change Hotkey") + " (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
         let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "h")
         hotkeyItem.target = self
         menu.addItem(hotkeyItem)
         menu.addItem(NSMenuItem.separator())
-        let aboutItem = NSMenuItem(title: "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: isKorean ? "ClipGo 정보" : "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
-        let quitItem = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: isKorean ? "종료" : "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
         return menu
@@ -119,17 +120,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAboutClipGo() {
-        let alert = NSAlert()
-        alert.messageText = "ClipGo"
-        alert.informativeText = "Version 1.0\nAll rights reserved, 2025 gojaehyun\nMade by Gojaehyun, who loves Jesus"
-        if let icon = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil) {
-            alert.icon = icon
-        }
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        let hosting = NSHostingController(rootView: AboutClipGoView())
+        let window = NSWindow(contentViewController: hosting)
+        window.title = "About ClipGo"
+        window.styleMask = [.titled, .closable]
+        window.setContentSize(NSSize(width: 340, height: 360))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func quitApp() {
         NSApp.terminate(nil)
+    }
+}
+
+struct AboutClipGoView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "paperclip")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 96, height: 96)
+                .foregroundColor(.accentColor)
+                .padding(.top, 24)
+            Text("ClipGo")
+                .font(.system(size: 32, weight: .bold))
+                .padding(.top, 8)
+            Text("Version 1.0")
+                .font(.title3)
+                .foregroundColor(.secondary)
+            Text("All rights reserved, 2025 gojaehyun")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text("Made by Gojaehyun, who loves Jesus")
+                .font(.footnote)
+                .foregroundColor(.gray)
+                .padding(.bottom, 24)
+        }
+        .frame(width: 340, height: 360)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 }

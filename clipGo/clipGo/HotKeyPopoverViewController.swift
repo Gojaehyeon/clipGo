@@ -2,15 +2,19 @@ import Cocoa
 import HotKey
 
 class HotKeyPopoverViewController: NSViewController {
+    private let isKorean = Locale.current.languageCode == "ko"
     private let currentHotKeyLabel = NSTextField(labelWithString: "")
-    private let changeButton = NSButton(title: "Change", target: nil, action: nil)
-    private let saveButton = NSButton(title: "Save", target: nil, action: nil)
+    private let changeButton = NSButton(title: "", target: nil, action: nil)
+    private let saveButton = NSButton(title: "", target: nil, action: nil)
     private var keyMonitor: Any?
     private var capturedKey: Key?
     private var capturedModifiers: NSEvent.ModifierFlags?
     private var isCapturing = false
-    private var currentHotKeyPrefix: String { "Current Hotkey: " }
-    private var inputGuideText: String { "Enter new hotkey..." }
+    private var currentHotKeyPrefix: String { isKorean ? "현재 단축키: " : "Current Hotkey: " }
+    private var inputGuideText: String { isKorean ? "새 단축키를 입력하세요..." : "Enter new hotkey..." }
+    private var changeButtonTitle: String { isKorean ? "변경" : "Change" }
+    private var saveButtonTitle: String { isKorean ? "저장" : "Save" }
+    private var unsupportedKeyText: String { isKorean ? "지원하지 않는 키입니다. 다시 시도하세요." : "Unsupported key. Try again." }
 
     override func loadView() {
         self.view = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 120))
@@ -23,6 +27,8 @@ class HotKeyPopoverViewController: NSViewController {
         saveButton.font = NSFont.systemFont(ofSize: 13)
         changeButton.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
+        changeButton.title = changeButtonTitle
+        saveButton.title = saveButtonTitle
         // 버튼 그룹 StackView
         let buttonStack = NSStackView(views: [changeButton, saveButton])
         buttonStack.orientation = .horizontal
@@ -75,7 +81,7 @@ class HotKeyPopoverViewController: NSViewController {
                 self.capturedModifiers = modifiers
                 self.currentHotKeyLabel.stringValue = self.currentHotKeyPrefix + self.describeHotKey(key: key, modifiers: modifiers)
             } else {
-                self.currentHotKeyLabel.stringValue = "Unsupported key. Try again."
+                self.currentHotKeyLabel.stringValue = self.unsupportedKeyText
             }
             self.isCapturing = false
             return nil
