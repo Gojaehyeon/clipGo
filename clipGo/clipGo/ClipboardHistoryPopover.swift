@@ -30,6 +30,14 @@ struct ClipboardHistoryPopover: View {
         }
     }
 
+    // 1~9, qwerty...m까지 키보드 순서 단축키
+    let keyMap: [String] = [
+        "1","2","3","4","5","6","7","8","9",
+        "q","w","e","r","t","y","u","i","o","p",
+        "a","s","d","f","g","h","j","k","l",
+        "z","x","c","v","b","n","m"
+    ]
+
     var body: some View {
         ZStack {
             if filteredHistory.isEmpty {
@@ -80,8 +88,8 @@ struct ClipboardHistoryPopover: View {
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                         Spacer(minLength: 0)
-                                        if index < 9 {
-                                            Text("\(index+1)")
+                                        if index < keyMap.count {
+                                            Text(keyMap[index])
                                                 .font(.system(size: 12, weight: .regular, design: .monospaced))
                                                 .foregroundColor(.secondary)
                                                 .frame(width: 18, alignment: .trailing)
@@ -160,8 +168,8 @@ struct ClipboardHistoryPopover: View {
                         }
                         return nil
                     }
-                } else if let num = Int(key), num >= 1, num <= 9, filteredHistory.count >= num {
-                    onSelect(filteredHistory[num-1])
+                } else if let idx = keyMap.firstIndex(of: key.lowercased()), filteredHistory.indices.contains(idx) {
+                    onSelect(filteredHistory[idx])
                     return nil
                 }
                 return event
@@ -188,6 +196,8 @@ struct FocusableRow<Content: View>: View {
             if isHovering || selectedIndex == index {
                 Color.accentColor.opacity(isHovering ? 0.12 : 0.18)
                     .cornerRadius(6)
+            } else {
+                Color.clear // 불투명 배경 없이 투명만
             }
             HStack(spacing: 8) {
                 content()
@@ -196,7 +206,7 @@ struct FocusableRow<Content: View>: View {
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
+//        .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovering = hovering

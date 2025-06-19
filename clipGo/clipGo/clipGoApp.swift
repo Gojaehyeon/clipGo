@@ -41,6 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
         print("[AppDelegate] Application did finish launching")
         // 메뉴바 아이콘 및 메뉴 생성
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -52,6 +53,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = buildMenu()
         HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showCustomPopover))
         clipboardManager.movePastedToTop = movePastedToTop
+        // 단축키 변경 시 메뉴 갱신
+        NotificationCenter.default.addObserver(self, selector: #selector(hotKeyChanged), name: HotKeyManager.hotKeyChangedNotification, object: nil)
     }
 
     func buildMenu() -> NSMenu {
@@ -230,6 +233,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         movePastedToTop.toggle()
         clipboardManager.movePastedToTop = movePastedToTop
         statusItem?.menu = buildMenu() // 메뉴 갱신
+    }
+
+    @objc func hotKeyChanged() {
+        statusItem?.menu = buildMenu()
     }
 }
 

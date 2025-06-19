@@ -39,7 +39,7 @@ class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int
-    private let maxHistory = 20
+    private let maxHistory = 100
     var movePastedToTop: Bool = false
 
     init() {
