@@ -34,9 +34,22 @@
 		C7BC6D8D2E03F32B0048470C /* clipGoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = clipGoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C7BC6DCF2E0452B80048470C /* Exceptions for "clipGo" folder in "clipGo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C7BC6D742E03F3280048470C /* clipGo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C7BC6D772E03F3280048470C /* clipGo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C7BC6DCF2E0452B80048470C /* Exceptions for "clipGo" folder in "clipGo" target */,
+			);
 			path = clipGo;
 			sourceTree = "<group>";
 		};
@@ -415,6 +428,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = clipGo/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Clipgo!";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -443,6 +459,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = clipGo/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Clipgo!";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

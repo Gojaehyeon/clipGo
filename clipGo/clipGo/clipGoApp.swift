@@ -110,7 +110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     if let idx = self.clipboardManager.history.firstIndex(of: item) {
                         self.clipboardManager.history.remove(at: idx)
                         self.clipboardManager.history.insert(item, at: 0)
-                    }
+        }
                 }
                 self.popoverPanel?.close()
                 self.popoverPanel = nil

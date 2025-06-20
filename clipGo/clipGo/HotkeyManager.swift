@@ -47,4 +47,4 @@ final class HotKeyManager {
         }
         return parts.joined(separator: " + ")
     }
-} 
+}
