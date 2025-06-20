@@ -29,6 +29,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popoverPanel: NSPanel?
     var escKeyMonitor: Any?
     var prevApp: NSRunningApplication? = nil
+    var finderHotKey: HotKey?
 
     var isKorean: Bool {
         Locale.current.language.languageCode?.identifier == "ko"
@@ -38,6 +39,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var movePastedToTop: Bool {
         get { UserDefaults.standard.bool(forKey: "movePastedToTop") }
         set { UserDefaults.standard.set(newValue, forKey: "movePastedToTop") }
+    }
+
+    var deleteAfterPasting: Bool {
+        get { UserDefaults.standard.bool(forKey: "deleteAfterPasting") }
+        set { UserDefaults.standard.set(newValue, forKey: "deleteAfterPasting") }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -52,6 +58,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem?.menu = buildMenu()
         HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showCustomPopover))
+        // Finder 선택 항목 추가 단축키 등록
+        let finderKeyCombo = KeyCombo(key: .c, modifiers: [.command, .shift])
+        self.finderHotKey = HotKey(keyCombo: finderKeyCombo)
+        self.finderHotKey?.keyDownHandler = { [weak self] in
+            self?.addImagesFromFinderSelection()
+        }
+        
         clipboardManager.movePastedToTop = movePastedToTop
         // 단축키 변경 시 메뉴 갱신
         NotificationCenter.default.addObserver(self, selector: #selector(hotKeyChanged), name: HotKeyManager.hotKeyChangedNotification, object: nil)
@@ -63,6 +76,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: isKorean ? "ClipGo 정보" : "About ClipGo", action: #selector(showAboutClipGo), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
+        menu.addItem(NSMenuItem.separator())
+        // 이미지 추가... 메뉴
+        let addImageItem = NSMenuItem(title: isKorean ? "이미지 추가..." : "Add Image...", action: #selector(addImageFromFile), keyEquivalent: "")
+        addImageItem.target = self
+        menu.addItem(addImageItem)
         menu.addItem(NSMenuItem.separator())
         let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear All", action: #selector(clearAllHistory), keyEquivalent: "")
         clearAllItem.target = self
@@ -78,6 +96,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         moveToTopItem.state = movePastedToTop ? .on : .off
         moveToTopItem.setAccessibilityRole(.checkBox)
         menu.addItem(moveToTopItem)
+        
+        let deleteAfterPastingTitle = isKorean ? "붙여넣기 후 삭제" : "Delete after pasting"
+        let deleteAfterPastingItem = NSMenuItem(title: deleteAfterPastingTitle, action: #selector(toggleDeleteAfterPasting), keyEquivalent: "")
+        deleteAfterPastingItem.target = self
+        deleteAfterPastingItem.state = deleteAfterPasting ? .on : .off
+        deleteAfterPastingItem.setAccessibilityRole(.checkBox)
+        menu.addItem(deleteAfterPastingItem)
+        
         menu.addItem(NSMenuItem.separator())
         let quitItem = NSMenuItem(title: isKorean ? "종료" : "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
@@ -106,23 +132,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             clipboardManager: clipboardManager,
             onSelect: { [weak self] item in
                 guard let self = self else { return }
-                if self.movePastedToTop {
-                    if let idx = self.clipboardManager.history.firstIndex(of: item) {
-                        self.clipboardManager.history.remove(at: idx)
-                        self.clipboardManager.history.insert(item, at: 0)
-        }
-                }
+
+                // 패널 닫기
                 self.popoverPanel?.close()
                 self.popoverPanel = nil
                 if let monitor = self.escKeyMonitor {
                     NSEvent.removeMonitor(monitor)
                     self.escKeyMonitor = nil
                 }
-                // 이전 앱으로 포커스 복원
+
+                // 붙여넣기 실행
                 if let prevApp = self.prevApp {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                         prevApp.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-                        // 약간의 딜레이 후 붙여넣기
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                             self.clipboardManager.copyToPasteboard(item, paste: true)
                         }
@@ -131,11 +153,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     self.clipboardManager.copyToPasteboard(item, paste: true)
                 }
+
+                // 붙여넣기 후 히스토리 처리
+                if self.deleteAfterPasting {
+                    self.clipboardManager.history.removeAll(where: { $0.id == item.id })
+                } else if self.movePastedToTop {
+                    if let idx = self.clipboardManager.history.firstIndex(of: item) {
+                        self.clipboardManager.history.remove(at: idx)
+                        self.clipboardManager.history.insert(item, at: 0)
+                    }
+                }
             },
             onChangeHotkey: { [weak self] in self?.showHotKeyPopoverMenu() }
         )
         let hosting = NSHostingController(rootView: contentView)
         let panel = NSPanel(contentViewController: hosting)
+        hosting.view.registerForDraggedTypes([.fileURL, .png, .tiff])
         panel.styleMask = [.titled, .nonactivatingPanel, .fullSizeContentView]
         panel.isFloatingPanel = true
         panel.level = .floating
@@ -235,8 +268,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = buildMenu() // 메뉴 갱신
     }
 
+    @objc func toggleDeleteAfterPasting() {
+        deleteAfterPasting.toggle()
+        statusItem?.menu = buildMenu() // 메뉴 갱신
+    }
+
     @objc func hotKeyChanged() {
         statusItem?.menu = buildMenu()
+    }
+
+    @objc func addImageFromFile() {
+        let panel = NSOpenPanel()
+        panel.allowedFileTypes = ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "heic"]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.begin { [weak self] result in
+            guard result == .OK else { return }
+            for url in panel.urls {
+                if let image = NSImage(contentsOf: url) {
+                    self?.clipboardManager.addImageToClipboard(image, name: url.lastPathComponent)
+                }
+            }
+        }
+    }
+
+    @objc func addImagesFromFinderSelection() {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
+              frontmostApp.bundleIdentifier == "com.apple.finder" else {
+            print("Finder is not the frontmost application.")
+            return
+        }
+        
+        let scriptSource = """
+        tell application "Finder"
+            if not application "Finder" is running then
+                return {}
+            end if
+            set theSelection to selection
+            set thePaths to {}
+            repeat with eachItem in theSelection
+                try
+                    set end of thePaths to (the POSIX path of (eachItem as alias))
+                on error
+                    -- 파일을 별칭으로 강제 변환할 수 없는 항목은 무시
+                end try
+            end repeat
+            return thePaths
+        end tell
+        """
+
+        var error: NSDictionary?
+        guard let script = NSAppleScript(source: scriptSource) else { return }
+        let descriptor = script.executeAndReturnError(&error)
+
+        if let err = error {
+            print("AppleScript Error: \(err)")
+            return
+        }
+
+        // Coerce to a list descriptor to handle multiple selections
+        if let listDescriptor = descriptor.coerce(toDescriptorType: typeAEList) {
+            for i in 1...listDescriptor.numberOfItems {
+                if let path = listDescriptor.atIndex(i)?.stringValue {
+                    self.processImagePath(path)
+                }
+            }
+        } else if let path = descriptor.stringValue {
+            // Handle single selection
+            self.processImagePath(path)
+        }
+    }
+
+    private func processImagePath(_ path: String) {
+        let url = URL(fileURLWithPath: path)
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "heic", "webp"]
+        if imageExtensions.contains(url.pathExtension.lowercased()) {
+            if let image = NSImage(contentsOf: url) {
+                let name = url.lastPathComponent
+                DispatchQueue.main.async {
+                    self.clipboardManager.addImageToClipboard(image, name: name)
+                }
+            }
+        }
     }
 }
 

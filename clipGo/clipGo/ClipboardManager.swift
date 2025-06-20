@@ -3,13 +3,13 @@ import AppKit
 
 enum ClipboardItemType: Equatable {
     case text(String)
-    case image(NSImage)
+    case image(NSImage, name: String?)
 
     static func == (lhs: ClipboardItemType, rhs: ClipboardItemType) -> Bool {
         switch (lhs, rhs) {
         case let (.text(a), .text(b)):
             return a == b
-        case let (.image(a), .image(b)):
+        case let (.image(a, _), .image(b, _)):
             // 이미지 데이터가 같으면 true (간단히 tiffRepresentation 비교)
             return a.tiffRepresentation == b.tiffRepresentation
         default:
@@ -22,6 +22,12 @@ struct ClipboardItem: Identifiable, Equatable {
     let id: UUID
     let type: ClipboardItemType
     var isFavorite: Bool
+    var name: String? {
+        switch type {
+        case .image(_, let name): return name
+        default: return nil
+        }
+    }
     
     init(type: ClipboardItemType, isFavorite: Bool = false) {
         self.id = UUID()
@@ -61,7 +67,7 @@ class ClipboardManager: ObservableObject {
             if let newString = pasteboard.string(forType: .string), !newString.isEmpty {
                 newItem = ClipboardItem(type: .text(newString))
             } else if let imageData = pasteboard.data(forType: .tiff), let image = NSImage(data: imageData) {
-                newItem = ClipboardItem(type: .image(image))
+                newItem = ClipboardItem(type: .image(image, name: nil))
             }
             if let item = newItem {
                 if let existIdx = history.firstIndex(where: { $0.type == item.type }) {
@@ -84,7 +90,7 @@ class ClipboardManager: ObservableObject {
         switch item.type {
         case .text(let string):
             pasteboard.setString(string, forType: .string)
-        case .image(let image):
+        case .image(let image, let name):
             if let tiff = image.tiffRepresentation {
                 pasteboard.setData(tiff, forType: .tiff)
             }
@@ -102,5 +108,25 @@ class ClipboardManager: ObservableObject {
         cmdVDown?.post(tap: .cghidEventTap)
         cmdVUp?.flags = .maskCommand
         cmdVUp?.post(tap: .cghidEventTap)
+    }
+
+    func addImageToClipboard(_ image: NSImage, name: String? = nil) {
+        let finalName: String
+        if let providedName = name, !providedName.isEmpty {
+            finalName = providedName
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            finalName = formatter.string(from: Date())
+        }
+        
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
+        let item = ClipboardItem(type: .image(image, name: finalName))
+        if let existIdx = history.firstIndex(where: { $0.type == item.type }) {
+            history.remove(at: existIdx)
+        }
+        history.insert(item, at: 0)
+        history = Array(history.prefix(maxHistory))
     }
 } 

@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct ThinScrollbar: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
@@ -69,21 +70,28 @@ struct ClipboardHistoryPopover: View {
                                                     .padding(.leading, 12)
                                                     .frame(maxWidth: 180, alignment: .leading)
                                                     .fixedSize(horizontal: false, vertical: true)
-                                            case .image(let image):
-                                                if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                                                    Image(decorative: cgImage, scale: 1.0)
-                                                        .resizable()
-                                                        .aspectRatio(contentMode: .fit)
-                                                        .frame(width: 30, height: 30)
-                                                        .cornerRadius(4)
-                                                        .padding(.vertical, 4)
-                                                        .padding(.leading, 12)
-                                                } else {
-                                                    Text(isKorean ? "[이미지]" : "[Image]")
-                                                        .font(.system(size: 12))
-                                                        .padding(.vertical, 4)
-                                                        .padding(.leading, 12)
+                                            case .image(let image, _):
+                                                HStack(spacing: 8) {
+                                                    if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                                                        Image(decorative: cgImage, scale: 1.0)
+                                                            .resizable()
+                                                            .aspectRatio(contentMode: .fit)
+                                                            .frame(width: 30, height: 30)
+                                                            .cornerRadius(4)
+                                                    } else {
+                                                        Text(isKorean ? "[이미지]" : "[Image]")
+                                                            .font(.system(size: 12))
+                                                    }
+                                                    if let name = item.name {
+                                                        Text(name)
+                                                            .font(.system(size: 11))
+                                                            .foregroundColor(.secondary)
+                                                            .lineLimit(1)
+                                                            .truncationMode(.middle)
+                                                    }
                                                 }
+                                                .padding(.vertical, 4)
+                                                .padding(.leading, 12)
                                             }
                                         }
                                         .buttonStyle(PlainButtonStyle())
@@ -181,6 +189,30 @@ struct ClipboardHistoryPopover: View {
                 NSEvent.removeMonitor(monitor)
                 keyMonitor = nil
             }
+        }
+        .onDrop(of: [UTType.image, UTType.fileURL], isTargeted: nil) { providers in
+            for provider in providers {
+                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                    provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, error in
+                        guard let data = data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                        DispatchQueue.main.async {
+                            if let image = NSImage(contentsOf: url) {
+                                let name = url.lastPathComponent
+                                clipboardManager.addImageToClipboard(image, name: name)
+                            }
+                        }
+                    }
+                } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    provider.loadObject(ofClass: NSImage.self) { image, error in
+                        guard let image = image as? NSImage else { return }
+                        DispatchQueue.main.async {
+                            let name = provider.suggestedName
+                            clipboardManager.addImageToClipboard(image, name: name)
+                        }
+                    }
+                }
+            }
+            return true
         }
     }
 }
