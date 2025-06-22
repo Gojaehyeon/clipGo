@@ -29,7 +29,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popoverPanel: NSPanel?
     var escKeyMonitor: Any?
     var prevApp: NSRunningApplication? = nil
-    var finderHotKey: HotKey?
 
     var isKorean: Bool {
         Locale.current.language.languageCode?.identifier == "ko"
@@ -58,12 +57,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem?.menu = buildMenu()
         HotKeyManager.shared.registerDefaultHotKey(target: self, action: #selector(showCustomPopover))
-        // Finder 선택 항목 추가 단축키 등록
-        let finderKeyCombo = KeyCombo(key: .c, modifiers: [.command, .shift])
-        self.finderHotKey = HotKey(keyCombo: finderKeyCombo)
-        self.finderHotKey?.keyDownHandler = { [weak self] in
-            self?.addImagesFromFinderSelection()
-        }
         
         clipboardManager.movePastedToTop = movePastedToTop
         // 단축키 변경 시 메뉴 갱신
@@ -82,22 +75,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         addImageItem.target = self
         menu.addItem(addImageItem)
         menu.addItem(NSMenuItem.separator())
-        let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear All", action: #selector(clearAllHistory), keyEquivalent: "")
+        let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear History", action: #selector(clearAllHistory), keyEquivalent: "")
         clearAllItem.target = self
         menu.addItem(clearAllItem)
+        menu.addItem(NSMenuItem.separator())
         let hotkeyTitle = (isKorean ? "단축키 변경" : "Change Hotkey") + " (" + HotKeyManager.shared.currentHotKeyDescription() + ")"
         let hotkeyItem = NSMenuItem(title: hotkeyTitle, action: #selector(showHotKeyPopoverMenu), keyEquivalent: "")
         hotkeyItem.target = self
         menu.addItem(hotkeyItem)
         // 최근 붙여넣은 항목 상단 이동 체크박스
-        let moveToTopTitle = isKorean ? "최근 붙여넣은 항목 상단으로 보내기" : "Move pasted item to top"
+        let moveToTopTitle = isKorean ? "붙여넣은 항목 상단으로 보내기" : "Move pasted item to top"
         let moveToTopItem = NSMenuItem(title: moveToTopTitle, action: #selector(toggleMovePastedToTop), keyEquivalent: "")
         moveToTopItem.target = self
         moveToTopItem.state = movePastedToTop ? .on : .off
         moveToTopItem.setAccessibilityRole(.checkBox)
         menu.addItem(moveToTopItem)
         
-        let deleteAfterPastingTitle = isKorean ? "붙여넣기 후 삭제" : "Delete after pasting"
+        let deleteAfterPastingTitle = isKorean ? "붙여넣은 항목 삭제" : "Delete after pasting"
         let deleteAfterPastingItem = NSMenuItem(title: deleteAfterPastingTitle, action: #selector(toggleDeleteAfterPasting), keyEquivalent: "")
         deleteAfterPastingItem.target = self
         deleteAfterPastingItem.state = deleteAfterPasting ? .on : .off
@@ -287,66 +281,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             for url in panel.urls {
                 if let image = NSImage(contentsOf: url) {
                     self?.clipboardManager.addImageToClipboard(image, name: url.lastPathComponent)
-                }
-            }
-        }
-    }
-
-    @objc func addImagesFromFinderSelection() {
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
-              frontmostApp.bundleIdentifier == "com.apple.finder" else {
-            print("Finder is not the frontmost application.")
-            return
-        }
-        
-        let scriptSource = """
-        tell application "Finder"
-            if not application "Finder" is running then
-                return {}
-            end if
-            set theSelection to selection
-            set thePaths to {}
-            repeat with eachItem in theSelection
-                try
-                    set end of thePaths to (the POSIX path of (eachItem as alias))
-                on error
-                    -- 파일을 별칭으로 강제 변환할 수 없는 항목은 무시
-                end try
-            end repeat
-            return thePaths
-        end tell
-        """
-
-        var error: NSDictionary?
-        guard let script = NSAppleScript(source: scriptSource) else { return }
-        let descriptor = script.executeAndReturnError(&error)
-
-        if let err = error {
-            print("AppleScript Error: \(err)")
-            return
-        }
-
-        // Coerce to a list descriptor to handle multiple selections
-        if let listDescriptor = descriptor.coerce(toDescriptorType: typeAEList) {
-            for i in 1...listDescriptor.numberOfItems {
-                if let path = listDescriptor.atIndex(i)?.stringValue {
-                    self.processImagePath(path)
-                }
-            }
-        } else if let path = descriptor.stringValue {
-            // Handle single selection
-            self.processImagePath(path)
-        }
-    }
-
-    private func processImagePath(_ path: String) {
-        let url = URL(fileURLWithPath: path)
-        let imageExtensions = ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "heic", "webp"]
-        if imageExtensions.contains(url.pathExtension.lowercased()) {
-            if let image = NSImage(contentsOf: url) {
-                let name = url.lastPathComponent
-                DispatchQueue.main.async {
-                    self.clipboardManager.addImageToClipboard(image, name: name)
                 }
             }
         }

@@ -111,18 +111,9 @@ class ClipboardManager: ObservableObject {
     }
 
     func addImageToClipboard(_ image: NSImage, name: String? = nil) {
-        let finalName: String
-        if let providedName = name, !providedName.isEmpty {
-            finalName = providedName
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss"
-            finalName = formatter.string(from: Date())
-        }
-        
         pasteboard.clearContents()
         pasteboard.writeObjects([image])
-        let item = ClipboardItem(type: .image(image, name: finalName))
+        let item = ClipboardItem(type: .image(image, name: name))
         if let existIdx = history.firstIndex(where: { $0.type == item.type }) {
             history.remove(at: existIdx)
         }
