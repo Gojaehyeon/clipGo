@@ -20,6 +20,7 @@ struct ClipboardHistoryPopover: View {
     @State private var selectedIndex: Int? = nil
     @State private var searchText: String = ""
     @FocusState private var isSearchFieldFocused: Bool
+    @State private var isKeyboardSelection: Bool = false
     
     enum Tab { case all, favorite }
     // 정렬 모드
@@ -33,7 +34,13 @@ struct ClipboardHistoryPopover: View {
             }
         }
     }
-    @State private var sortMode: SortMode = .newest
+    @State private var sortMode: SortMode = {
+        if let raw = UserDefaults.standard.string(forKey: "sortMode"),
+           let mode = SortMode(rawValue: raw) {
+            return mode
+        }
+        return .newest
+    }()
     var isKorean: Bool {
         Locale.current.language.languageCode?.identifier == "ko"
     }
@@ -123,6 +130,7 @@ struct ClipboardHistoryPopover: View {
                                     FocusableRow(
                                         index: index,
                                         selectedIndex: $selectedIndex,
+                                        isKeyboardSelection: $isKeyboardSelection,
                                         onSelect: { onSelect(item) }
                                     ) {
                                         Button(action: { onSelect(item) }) {
@@ -179,7 +187,7 @@ struct ClipboardHistoryPopover: View {
                             }
                         }
                         .onChange(of: selectedIndex) { idx in
-                            if let idx = idx {
+                            if isKeyboardSelection, let idx = idx {
                                 withAnimation { proxy.scrollTo(idx, anchor: .center) }
                             }
                         }
@@ -207,7 +215,9 @@ struct ClipboardHistoryPopover: View {
                             // sortMode 순환
                             let all = SortMode.allCases
                             if let idx = all.firstIndex(of: sortMode) {
-                                sortMode = all[(idx + 1) % all.count]
+                                let newMode = all[(idx + 1) % all.count]
+                                sortMode = newMode
+                                UserDefaults.standard.set(newMode.rawValue, forKey: "sortMode")
                             }
                         }) {
                             Text(sortMode.label)
@@ -249,16 +259,19 @@ struct ClipboardHistoryPopover: View {
                 // 키보드 위/아래/엔터는 항상 목록 제어
                 if event.keyCode == 125 { // ↓
                     if let idx = selectedIndex, idx < searchedHistory.count - 1 {
+                        isKeyboardSelection = true
                         selectedIndex = idx + 1
                     }
                     return nil
                 } else if event.keyCode == 126 { // ↑
                     if let idx = selectedIndex, idx > 0 {
+                        isKeyboardSelection = true
                         selectedIndex = idx - 1
                     }
                     return nil
                 } else if event.keyCode == 36 || event.keyCode == 76 { // Return/Enter
                     if let idx = selectedIndex, searchedHistory.indices.contains(idx) {
+                        isKeyboardSelection = true
                         onSelect(searchedHistory[idx])
                         return nil
                     }
@@ -324,6 +337,7 @@ struct ClipboardHistoryPopover: View {
 struct FocusableRow<Content: View>: View {
     let index: Int
     @Binding var selectedIndex: Int?
+    @Binding var isKeyboardSelection: Bool
     let onSelect: () -> Void
     @ViewBuilder let content: () -> Content
     @State private var isHovering = false
@@ -343,7 +357,10 @@ struct FocusableRow<Content: View>: View {
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovering = hovering
-            if hovering { selectedIndex = index }
+            if hovering {
+                isKeyboardSelection = false
+                selectedIndex = index
+            }
         }
         .onTapGesture { onSelect() }
     }
