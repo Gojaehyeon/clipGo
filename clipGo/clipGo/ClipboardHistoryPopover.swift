@@ -18,16 +18,65 @@ struct ClipboardHistoryPopover: View {
     @State private var selectedTab: Tab = .all
     @State private var keyMonitor: Any? = nil
     @State private var selectedIndex: Int? = nil
+    @State private var searchText: String = ""
+    @FocusState private var isSearchFieldFocused: Bool
     
     enum Tab { case all, favorite }
+    // 정렬 모드
+    enum SortMode: String, CaseIterable {
+        case newest, oldest, type
+        var label: String {
+            switch self {
+            case .newest: return Locale.current.language.languageCode?.identifier == "ko" ? "최신순" : "Newest"
+            case .oldest: return Locale.current.language.languageCode?.identifier == "ko" ? "오래된순" : "Oldest"
+            case .type:   return Locale.current.language.languageCode?.identifier == "ko" ? "유형별" : "By Type"
+            }
+        }
+    }
+    @State private var sortMode: SortMode = .newest
     var isKorean: Bool {
         Locale.current.language.languageCode?.identifier == "ko"
     }
     
     var filteredHistory: [ClipboardItem] {
+        let base: [ClipboardItem]
         switch selectedTab {
-        case .all: return clipboardManager.history
-        case .favorite: return clipboardManager.history.filter { $0.isFavorite }
+        case .all: base = clipboardManager.history
+        case .favorite: base = clipboardManager.history.filter { $0.isFavorite }
+        }
+        // 정렬 적용
+        switch sortMode {
+        case .newest:
+            return base
+        case .oldest:
+            return base.reversed()
+        case .type:
+            // 이미지 먼저, 그 다음 텍스트
+            let images = base.filter {
+                if case .image = $0.type { return true } else { return false }
+            }
+            let texts = base.filter {
+                if case .text = $0.type { return true } else { return false }
+            }
+            return images + texts
+        }
+    }
+
+    var searchedHistory: [ClipboardItem] {
+        if searchText.isEmpty {
+            return filteredHistory
+        } else {
+            return filteredHistory.filter { item in
+                switch item.type {
+                case .text(let string):
+                    return string.localizedCaseInsensitiveContains(searchText)
+                case .image:
+                    if let name = item.name {
+                        return name.localizedCaseInsensitiveContains(searchText)
+                    }
+                    return false
+                }
+            }
         }
     }
 
@@ -41,18 +90,36 @@ struct ClipboardHistoryPopover: View {
 
     var body: some View {
         ZStack {
-            if filteredHistory.isEmpty {
-                Text(isKorean ? "클립보드 기록 없음" : "No clipboard history")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 15, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            } else {
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                // Search Bar - 항상 표시
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField(isKorean ? "검색 (⌘F)" : "Search (⌘F)", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .font(.system(size: 14))
+                        .focused($isSearchFieldFocused)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                Divider()
+
+                // Conditional Content - 검색 결과에 따라 변경
+                if filteredHistory.isEmpty {
+                    Text(isKorean ? "클립보드 기록 없음" : "No clipboard history")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if searchedHistory.isEmpty {
+                    Text(isKorean ? "검색 결과 없음" : "No search results")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(spacing: 0) {
-                                ForEach(Array(filteredHistory.enumerated()), id: \ .offset) { (index, item) in
+                                ForEach(Array(searchedHistory.enumerated()), id: \.offset) { (index, item) in
                                     FocusableRow(
                                         index: index,
                                         selectedIndex: $selectedIndex,
@@ -111,44 +178,77 @@ struct ClipboardHistoryPopover: View {
                                 }
                             }
                         }
-                        .background(ThinScrollbar())
                         .onChange(of: selectedIndex) { idx in
                             if let idx = idx {
                                 withAnimation { proxy.scrollTo(idx, anchor: .center) }
                             }
                         }
                     }
-                    Spacer(minLength: 0)
                 }
             }
-            VStack {
-                Spacer()
-                Button(action: {
-                    clipboardManager.history.removeAll()
-                }) {
-                    Text(isKorean ? "전체 삭제" : "Clear All")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 4)
+
+            // "전체 삭제" 버튼 - 하단에 항상 위치
+            if !filteredHistory.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            clipboardManager.history.removeAll()
+                            searchText = ""
+                        }) {
+                            Text(isKorean ? "전체 삭제" : "Clear All")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(alignment: .center)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                        // 정렬 버튼
+                        Button(action: {
+                            // sortMode 순환
+                            let all = SortMode.allCases
+                            if let idx = all.firstIndex(of: sortMode) {
+                                sortMode = all[(idx + 1) % all.count]
+                            }
+                        }) {
+                            Text(sortMode.label)
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(alignment: .center)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 0)
+                    .padding(.bottom, 16)
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 0)
-                .padding(.bottom, 16)
             }
         }
         .background(.ultraThinMaterial)
         .cornerRadius(25)
-        .frame(width: 320)
+        .frame(width: 320, height: 450)
+        .onChange(of: searchText) { _ in
+            if !searchedHistory.isEmpty {
+                selectedIndex = 0
+            } else {
+                selectedIndex = nil
+            }
+        }
         .onAppear {
-            // 창이 열릴 때 첫 번째 아이템에 선택
-            if !filteredHistory.isEmpty {
+            DispatchQueue.main.async {
+                isSearchFieldFocused = false
+            }
+            if !searchedHistory.isEmpty {
                 selectedIndex = 0
             }
-            // 키보드 네비게이션/엔터/숫자키/삭제 핸들러 등록
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                let key = event.charactersIgnoringModifiers ?? ""
+                // Command-F to focus search (keyCode 3 is 'f')
+                if event.modifierFlags.contains(.command) && event.keyCode == 3 {
+                    isSearchFieldFocused = true
+                    return nil
+                }
+                
+                // 키보드 위/아래/엔터는 항상 목록 제어
                 if event.keyCode == 125 { // ↓
-                    if let idx = selectedIndex, idx < filteredHistory.count - 1 {
+                    if let idx = selectedIndex, idx < searchedHistory.count - 1 {
                         selectedIndex = idx + 1
                     }
                     return nil
@@ -158,33 +258,37 @@ struct ClipboardHistoryPopover: View {
                     }
                     return nil
                 } else if event.keyCode == 36 || event.keyCode == 76 { // Return/Enter
-                    if let idx = selectedIndex, filteredHistory.indices.contains(idx) {
-                        onSelect(filteredHistory[idx])
+                    if let idx = selectedIndex, searchedHistory.indices.contains(idx) {
+                        onSelect(searchedHistory[idx])
                         return nil
                     }
-                } else if event.keyCode == 51 { // Delete(⌫)
-                    if let idx = selectedIndex, filteredHistory.indices.contains(idx) {
-                        let item = filteredHistory[idx]
+                }
+
+                if isSearchFieldFocused {
+                    if event.keyCode == 53 { // ESC
+                        isSearchFieldFocused = false
+                        return nil
+                    }
+                    return event
+                }
+
+                let key = event.charactersIgnoringModifiers ?? ""
+                if event.keyCode == 51 { // Delete(⌫)
+                    if let idx = selectedIndex, searchedHistory.indices.contains(idx) {
+                        let item = searchedHistory[idx]
                         if let realIdx = clipboardManager.history.firstIndex(of: item) {
                             clipboardManager.history.remove(at: realIdx)
-                            // 삭제 후 포커스 이동
-                            if clipboardManager.history.isEmpty {
-                                selectedIndex = nil
-                            } else if idx >= clipboardManager.history.count {
-                                selectedIndex = clipboardManager.history.count - 1
-                            }
                         }
                         return nil
                     }
-                } else if let idx = keyMap.firstIndex(of: key.lowercased()), filteredHistory.indices.contains(idx) {
-                    onSelect(filteredHistory[idx])
+                } else if let idx = keyMap.firstIndex(of: key.lowercased()), searchedHistory.indices.contains(idx) {
+                    onSelect(searchedHistory[idx])
                     return nil
                 }
                 return event
             }
         }
         .onDisappear {
-            // 키보드 모니터 해제
             if let monitor = keyMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyMonitor = nil
@@ -228,8 +332,6 @@ struct FocusableRow<Content: View>: View {
             if isHovering || selectedIndex == index {
                 Color.accentColor.opacity(isHovering ? 0.12 : 0.18)
                     .cornerRadius(6)
-            } else {
-                Color.clear // 불투명 배경 없이 투명만
             }
             HStack(spacing: 8) {
                 content()
@@ -238,7 +340,6 @@ struct FocusableRow<Content: View>: View {
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
-//        .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovering = hovering

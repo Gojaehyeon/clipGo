@@ -4,5 +4,7 @@
 <dict>
 	<key>LSapplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>SMAppServiceApplication</key>
+	<true/>
 </dict>
 </plist>

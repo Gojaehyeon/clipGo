@@ -7,6 +7,7 @@
 
 import SwiftUI
 import HotKey
+import ServiceManagement
 
 @main
 struct ClipGoApp: App {
@@ -48,6 +49,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         print("[AppDelegate] Application did finish launching")
+        // Launch at login 등록
+        do {
+            try SMAppService.mainApp.register()
+            print("[AppDelegate] Registered for launch at login")
+        } catch {
+            print("[AppDelegate] Failed to register for launch at login: \(error)")
+        }
         // 메뉴바 아이콘 및 메뉴 생성
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
@@ -74,6 +82,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let addImageItem = NSMenuItem(title: isKorean ? "이미지 추가..." : "Add Image...", action: #selector(addImageFromFile), keyEquivalent: "")
         addImageItem.target = self
         menu.addItem(addImageItem)
+        menu.addItem(NSMenuItem.separator())
+        // 클립보드 열기 메뉴 추가
+        let openClipboardItem = NSMenuItem(title: isKorean ? "클립보드 열기" : "Open Clipboard", action: #selector(showCustomPopover), keyEquivalent: "")
+        openClipboardItem.target = self
+        menu.addItem(openClipboardItem)
         menu.addItem(NSMenuItem.separator())
         let clearAllItem = NSMenuItem(title: isKorean ? "전체 삭제" : "Clear History", action: #selector(clearAllHistory), keyEquivalent: "")
         clearAllItem.target = self
@@ -279,7 +292,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.begin { [weak self] result in
             guard result == .OK else { return }
             for url in panel.urls {
-                if let image = NSImage(contentsOf: url) {
+                if let data = try? Data(contentsOf: url), let image = NSImage(data: data) {
                     self?.clipboardManager.addImageToClipboard(image, name: url.lastPathComponent)
                 }
             }
@@ -299,7 +312,7 @@ struct AboutClipGoView: View {
             Text("ClipGo")
                 .font(.system(size: 32, weight: .bold))
                 .padding(.top, 8)
-            Text("Version 1.0")
+            Text("Version 1.3")
                 .font(.title3)
                 .foregroundColor(.secondary)
             Text("All rights reserved, 2025 gojaehyun")
