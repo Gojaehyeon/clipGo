@@ -21,6 +21,9 @@ struct ClipboardHistoryPopover: View {
     @State private var searchText: String = ""
     @FocusState private var isSearchFieldFocused: Bool
     @State private var isKeyboardSelection: Bool = false
+    @State private var isHoveringClearAll = false
+    @State private var isHoveringSort = false
+    @State private var isHoveringOverBottomBar = false
     
     enum Tab { case all, favorite }
     // 정렬 모드
@@ -136,15 +139,24 @@ struct ClipboardHistoryPopover: View {
                                         Button(action: { onSelect(item) }) {
                                             switch item.type {
                                             case .text(let string):
-                                                let displayText = string.count > 50 ? String(string.prefix(50)) + "..." : string
-                                                Text(displayText)
-                                                    .lineLimit(1)
-                                                    .truncationMode(.tail)
-                                                    .font(.system(size: 12))
-                                                    .padding(.vertical, 4)
-                                                    .padding(.leading, 12)
-                                                    .frame(maxWidth: 180, alignment: .leading)
-                                                    .fixedSize(horizontal: false, vertical: true)
+                                                HStack {
+                                                    Text(string)
+                                                        .lineLimit(1)
+                                                        .truncationMode(.tail)
+                                                        .font(.system(size: 13))
+                                                        .frame(minWidth: 220, maxWidth: .infinity, alignment: .leading)
+                                                        .layoutPriority(1)
+                                                    if index < keyMap.count {
+                                                        Text(keyMap[index])
+                                                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                                            .foregroundColor(.secondary)
+                                                            .frame(width: 28, alignment: .trailing)
+                                                    } else {
+                                                        Spacer().frame(width: 28)
+                                                    }
+                                                }
+                                                .padding(.vertical, 4)
+                                                .padding(.horizontal, 12)
                                             case .image(let image, _):
                                                 HStack(spacing: 8) {
                                                     if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
@@ -170,16 +182,7 @@ struct ClipboardHistoryPopover: View {
                                             }
                                         }
                                         .buttonStyle(PlainButtonStyle())
-                                        Spacer(minLength: 0)
-                                        if index < keyMap.count {
-                                            Text(keyMap[index])
-                                                .font(.system(size: 12, weight: .regular, design: .monospaced))
-                                                .foregroundColor(.secondary)
-                                                .frame(width: 18, alignment: .trailing)
-                                                .padding(.trailing, 12)
-                                        } else {
-                                            Spacer().frame(width: 18)
-                                        }
+                                        // Removed trailing keyMap label outside the Button as per instructions.
                                     }
                                     .id(index)
                                     Divider()
@@ -191,45 +194,71 @@ struct ClipboardHistoryPopover: View {
                                 withAnimation { proxy.scrollTo(idx, anchor: .center) }
                             }
                         }
+                        .zIndex(0)
                     }
                 }
             }
 
-            // "전체 삭제" 버튼 - 하단에 항상 위치
+            // "전체 삭제" 및 정렬 버튼 - 하단에 항상 위치, 백그라운드 클릭 차단
             if !filteredHistory.isEmpty {
                 VStack {
                     Spacer()
                     HStack(spacing: 12) {
-                        Button(action: {
-                            clipboardManager.history.removeAll()
-                            searchText = ""
-                        }) {
-                            Text(isKorean ? "전체 삭제" : "Clear All")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(alignment: .center)
-                                .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                        // 정렬 버튼
-                        Button(action: {
-                            // sortMode 순환
-                            let all = SortMode.allCases
-                            if let idx = all.firstIndex(of: sortMode) {
-                                let newMode = all[(idx + 1) % all.count]
-                                sortMode = newMode
-                                UserDefaults.standard.set(newMode.rawValue, forKey: "sortMode")
+                        ZStack {
+                            Button(action: {
+                                clipboardManager.history.removeAll()
+                                searchText = ""
+                            }) {
+                                Text(isKorean ? "전체 삭제" : "Clear All")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .frame(alignment: .center)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .background(isHoveringClearAll ? Color.accentColor.opacity(0.12) : Color.clear)
+                                    .cornerRadius(6)
                             }
-                        }) {
-                            Text(sortMode.label)
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(alignment: .center)
-                                .padding(.vertical, 4)
+                            .onHover { hovering in
+                                isHoveringClearAll = hovering
+                                isHoveringOverBottomBar = hovering
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+
+                        ZStack {
+                            Button(action: {
+                                let all = SortMode.allCases
+                                if let idx = all.firstIndex(of: sortMode) {
+                                    let newMode = all[(idx + 1) % all.count]
+                                    sortMode = newMode
+                                    UserDefaults.standard.set(newMode.rawValue, forKey: "sortMode")
+                                }
+                            }) {
+                                Text(sortMode.label)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .frame(alignment: .center)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .background(isHoveringSort ? Color.accentColor.opacity(0.12) : Color.clear)
+                                    .cornerRadius(6)
+                            }
+                            .onHover { hovering in
+                                isHoveringSort = hovering
+                                isHoveringOverBottomBar = hovering
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.horizontal, 0)
                     .padding(.bottom, 16)
+                    .background(
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .allowsHitTesting(true)
+                    )
+                    .zIndex(1)
                 }
+                .zIndex(1)
             }
         }
         .background(.ultraThinMaterial)
@@ -294,9 +323,18 @@ struct ClipboardHistoryPopover: View {
                         }
                         return nil
                     }
-                } else if let idx = keyMap.firstIndex(of: key.lowercased()), searchedHistory.indices.contains(idx) {
-                    onSelect(searchedHistory[idx])
-                    return nil
+                } else {
+                    // Use keyCode mapping to support shortcut keys even when Korean input is active
+                    let keyIndexMap: [UInt16: Int] = [
+                        18: 0, 19: 1, 20: 2, 21: 3, 23: 4, 22: 5, 26: 6, 28: 7, 25: 8, // 1~9
+                        12: 9, 13: 10, 14: 11, 15: 12, 17: 13, 16: 14, 32: 15, 34: 16, 31: 17, 35: 18, // q~p
+                        0: 19, 1: 20, 2: 21, 3: 22, 5: 23, 4: 24, 38: 25, 40: 26, 37: 27, // a~l
+                        6: 28, 7: 29, 8: 30, 9: 31, 11: 32, 45: 33, 46: 34 // z~m
+                    ]
+                    if let idx = keyIndexMap[event.keyCode], searchedHistory.indices.contains(idx) {
+                        onSelect(searchedHistory[idx])
+                        return nil
+                    }
                 }
                 return event
             }
@@ -341,6 +379,7 @@ struct FocusableRow<Content: View>: View {
     let onSelect: () -> Void
     @ViewBuilder let content: () -> Content
     @State private var isHovering = false
+    @Environment(\.isHoveringOverBottomBar) private var isHoveringOverBottomBar
     var body: some View {
         ZStack {
             if isHovering || selectedIndex == index {
@@ -356,6 +395,7 @@ struct FocusableRow<Content: View>: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onHover { hovering in
+            guard !isHoveringOverBottomBar else { return }
             isHovering = hovering
             if hovering {
                 isKeyboardSelection = false
@@ -366,3 +406,15 @@ struct FocusableRow<Content: View>: View {
     }
 }
  
+
+
+private struct IsHoveringOverBottomBarKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var isHoveringOverBottomBar: Bool {
+        get { self[IsHoveringOverBottomBarKey.self] }
+        set { self[IsHoveringOverBottomBarKey.self] = newValue }
+    }
+}
